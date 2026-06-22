@@ -1,6 +1,8 @@
 /* for IDE https://dl.espressif.com/dl/package_esp32_index.json
 esp arduino ide 2.0.11
 FastLED 3.4.0
+
+popa
 */
 #include <Arduino.h>
 
@@ -290,7 +292,6 @@ void computeSound() {
     filterFFT();
   }
 }
-
 
 
 
@@ -755,6 +756,7 @@ void sendDataToApp() {
   #undef addStr
 }
 
+
 const String genParsName[] = {
     "GET_DATA",
     "LowPass",
@@ -804,6 +806,7 @@ const String genParsName[] = {
     "bright="
   };
 int arraySize = sizeof(genParsName) / sizeof(genParsName[0]); 
+
 int getParamNumber(String nData) {
   for (int i = 0; i < arraySize; i++) 
     if (nData.indexOf(genParsName[i]) != -1) {
@@ -1001,6 +1004,12 @@ int udpCheckNetKey(char buff[MAX_UDP_PACKET_SIZE]) {
   return sizeof(NETWORK_KEY) + 12;
 }
 
+//Получение широковещательного адреса
+void getBroadcastIp() {
+  broadcastIP = WiFi.localIP();
+  broadcastIP[3] = 255;
+}
+
 //Хандлер юдп
 void udpListen() {
   if (!udp.parsePacket()) 
@@ -1021,12 +1030,6 @@ void udpListen() {
 
   this_ip = udp.remoteIP();
   updateData(udpBuffer);
-}
-
-//Получение широковещательного адреса
-void getBroadcastIp() {
-  broadcastIP = WiFi.localIP();
-  broadcastIP[3] = 255;
 }
 
 
