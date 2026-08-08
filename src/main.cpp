@@ -1,19 +1,18 @@
 /* for IDE https://dl.espressif.com/dl/package_esp32_index.json
 esp arduino ide 2.0.11
 FastLED 3.4.0
-
-popa
 */
 #include <Arduino.h>
 
 #define ENABLE_BUTTON
 
-#define TOTAL_LEDS 181
+#define TOTAL_LEDS 86 //181
 #define LED_PIN 22                // stripe 
 #define SOUND_R_1 35              // pin 1 sound
 #define SOUND_R_2 34              // pin 2 sound
 #define IDICATE_PIN 23
 #define BUTTON_PIN 12
+#define IR_PIN 4
 
 #define LED_CHIP WS2812
 #define LED_COLOR GRB
@@ -30,7 +29,8 @@ popa
 #define UDP_PORT_SEND 5396    //For debugging (local port in andriod app)
 #define MAX_UDP_PACKET_SIZE 255
 #define WIFI_CONNECTION_TRYS 20
-const char NETWORK_KEY[] = "";
+const char NETWORK_KEY[] = "KXCM";
+const char PAIR_KEY[] = "KXPD";
 char uid[13];
 
 
@@ -50,7 +50,7 @@ char uid[13];
 #include <DNSServer.h>
 #include <ESPmDNS.h>
 #include <ArduinoOTA.h>
-#include <SPIFFS.h>
+#include <LittleFS.h>
 #include <FileData.h>
 
 // НАСТРОЙКИ ПО УМОЛЧАНИЮ
@@ -146,10 +146,10 @@ CRGBPalette32 redtogreen_p = soundlevel_gp;
 IPAddress broadcastIP, this_ip;
 AsyncWebServer serverAP(80);
 DNSServer dnsServer;
-WiFiUDP udp;
+WiFiUDP udp, pairUdp;
 CRGB leds[NUM_LEDS];
 Settings data;
-FileData settings(&SPIFFS, "/settings.dat", 'B', &data, sizeof(data), 1500);
+FileData settings(&LittleFS, "/settings.dat", 'B', &data, sizeof(data), 1500);
 
 void fill_leds(const int from, const int to, CRGB color, const bool clr = true) {
   if (clr) 
@@ -189,12 +189,11 @@ void updateLowPass() {
 
     for (uint8_t j = 3; j < 28; j++) {
       if (spectr[j] > maxNoiseLevel) 
-        maxNoiseLevel = noiseLevel;
+        maxNoiseLevel = spectr[j];
     }
   }
   lowPassSpectr = maxNoiseLevel + data.addNoiseLPSpectr;
   
-  //debugUDP("LowPass Updated");
 }
 
 void filterFFT() {
@@ -205,15 +204,15 @@ void filterFFT() {
     if (spectr[i] < lowPassSpectr) 
       spectr[i] = 0;
     
-  for (uint8_t i = 2; i < 6; i++) //выборка нижних частот
+  for (uint8_t i = 1; i < 3; i++) //выборка нижних частот
     if (spectr[i] > colorMusic[0]) 
       colorMusic[0] = spectr[i];
   
-  for (uint8_t i = 6; i < 11; i++) //выборка средних частот
+  for (uint8_t i = 4; i < 12; i++) //выборка средних частот
     if (spectr[i] > colorMusic[1])  
       colorMusic[1] = spectr[i];
     
-  for (uint8_t i = 11; i < 29; i++) //выборка высоких частот
+  for (uint8_t i = 13; i < 30; i++) //выборка высоких частот
     if (spectr[i] > colorMusic[2]) 
       colorMusic[2] = spectr[i];
     
@@ -698,6 +697,17 @@ void updatePowerType(bool newPT) {
 
 //KXCM:aabbccddeeff>1=0.1%
 //Отправка настроек в приложение
+
+void udpSend(char *buf, bool broadcast = false) {
+  if (broadcast)
+    udp.beginPacket(broadcastIP, UDP_PORT_SEND);
+  else 
+    udp.beginPacket(this_ip, UDP_PORT_SEND);
+
+  udp.print(buf);
+  udp.endPacket();
+}
+
 void sendDataToApp() {
   String dataBuffer = String(NETWORK_KEY);
   #define addStr(t) dataBuffer = dataBuffer + t + ";"
@@ -756,6 +766,18 @@ void sendDataToApp() {
   #undef addStr
 }
 
+void sendUID() {
+  char str_buf[sizeof(NETWORK_KEY) + sizeof(uid) + 5];
+  
+  sniprintf(str_buf, sizeof(str_buf), "CM/%s:%s", NETWORK_KEY, uid);
+
+  udpSend(str_buf);
+}
+
+void startPairing() {
+  sendUID();
+}
+
 
 const String genParsName[] = {
     "GET_DATA",
@@ -803,14 +825,15 @@ const String genParsName[] = {
     "pulseColorPulseHue=",
     "pulseColorPulseSat=",
     "strobeWhiteSpeed=",
-    "bright="
+    "bright=",
+    "GETUID"
   };
 int arraySize = sizeof(genParsName) / sizeof(genParsName[0]); 
 
 int getParamNumber(String nData) {
   for (int i = 0; i < arraySize; i++) 
     if (nData.indexOf(genParsName[i]) != -1) {
-      Serial.printf("Name: %s\n\r", genParsName[i].c_str());
+      //Serial.printf("Name: %s\n\r", genParsName[i].c_str());
       return i;
     }
 
@@ -818,17 +841,16 @@ int getParamNumber(String nData) {
 }
 
 float getNewVar(String nData) {
-  float am = nData.substring(nData.indexOf("=") + 1).toFloat();
-  return am;
+  return nData.substring(nData.indexOf("=") + 1).toFloat();
 }
 
 //Обновление переменных
 void updateData(String newData) {
   const int paramNum = getParamNumber(newData);
 
-  Serial.printf("Num: %i\n\r", paramNum);
-  Serial.printf("Amount: %f\n\r", getNewVar(newData));
-  Serial.printf("Data: %s\n\r", newData.c_str());
+  //Serial.printf("Num: %i\n\r", paramNum);
+  //Serial.printf("Amount: %f\n\r", getNewVar(newData));
+  //Serial.printf("Data: %s\n\r", newData.c_str());
 
   switch (paramNum) {
     case -1:
@@ -972,42 +994,54 @@ void updateData(String newData) {
     case 45: //bright
       updateBright(getNewVar(newData)); 
       break;
+    case 46:
+      sendUID();
+      break;
   }
 
   settings.update();
 }
 
 //Проверка ключа сети
-int udpCheckNetKey(char buff[MAX_UDP_PACKET_SIZE]) {
+bool udpCheckNetKey(char buff[MAX_UDP_PACKET_SIZE]) {
   for (int i = 0; i < sizeof(NETWORK_KEY) - 1; i++) {
     if (buff[i] != NETWORK_KEY[i]) {
-      Serial.printf("B: %c\n\rK: %c\n\rI: %i", buff[i], NETWORK_KEY[i]);   
-      return -1;
+      //Serial.printf("B: %c\n\rK: %c\n\rI: %i", buff[i], NETWORK_KEY[i]);   
+      return true;
     }
   }
   
-  if (buff[sizeof(NETWORK_KEY) - 1] != ':') {
-    return -1;
-  }
+  if (buff[sizeof(NETWORK_KEY) - 1] != ':') 
+    return true;
+  
 
   for (int i = sizeof(NETWORK_KEY); i < sizeof(NETWORK_KEY) + 12; i++) {
     if (buff[i] != uid[i - sizeof(NETWORK_KEY)]) {
-      Serial.printf("B: %c\n\rU: %c\n\rI: %i", buff[i], uid[i], i); 
-      return -1;
+      //Serial.printf("B: %c\n\rU: %c\n\rI: %i", buff[i], uid[i], i); 
+      return true;
     }
   }
   
-  if (buff[sizeof(NETWORK_KEY) + 12] != '>') {
-    return -1;
-  }
+  if (buff[sizeof(NETWORK_KEY) + 12] != '>') 
+    return true;
   
-  return sizeof(NETWORK_KEY) + 12;
+  return false;
 }
 
 //Получение широковещательного адреса
 void getBroadcastIp() {
   broadcastIP = WiFi.localIP();
   broadcastIP[3] = 255;
+}
+
+bool checkPairRequest(char buff[MAX_UDP_PACKET_SIZE]) { //
+  for (int i = 0; i < sizeof(PAIR_KEY) - 1; i++) {
+    if (buff[i] != PAIR_KEY[i]) {
+      //Serial.printf("B: %c\n\rK: %c\n\rI: %i", buff[i], PAIR_KEY[i]);   
+      return false;
+    }
+  }
+  return true;
 }
 
 //Хандлер юдп
@@ -1017,8 +1051,13 @@ void udpListen() {
 
   char udpBuffer[MAX_UDP_PACKET_SIZE];
   int udpBufferSize = udp.read(udpBuffer, MAX_UDP_PACKET_SIZE);
+  
+  if (checkPairRequest(udpBuffer)) {
+    startPairing();
+    return;
+  }
 
-  if (udpCheckNetKey(udpBuffer) > 0) 
+  if (udpCheckNetKey(udpBuffer)) 
     return;
 
   String parsedBuffer = "";
@@ -1044,19 +1083,15 @@ void setupCaptivePortal(const IPAddress locIP) {
 //Запуск сервера на точке доступа
 void setupAPServer() {
   serverAP.onNotFound([](AsyncWebServerRequest *request) {
-    request->send(SPIFFS, "/index.html");
-  });
-
-  serverAP.on("/", HTTP_GET, [](AsyncWebServerRequest *request) {
-    request->send(SPIFFS, "/index.html");
+    request->send(LittleFS, "/index.html");
   });
 
   serverAP.on("/style.css", HTTP_GET, [](AsyncWebServerRequest *request){
-    request->send(SPIFFS, "/style.css");
+    request->send(LittleFS, "/style.css");
   });
 
   serverAP.on("/continue", HTTP_POST, [](AsyncWebServerRequest *request){
-    request->send(SPIFFS, "/submit.html");
+    request->send(LittleFS, "/submit.html");
     delay(100);
     return;
   });
@@ -1071,7 +1106,7 @@ void setupAPServer() {
       receivedPassword = request->getParam("password", true)->value();
     
     if (receivedSsid == "") {
-      request->send(SPIFFS, "/index.html");
+      request->send(LittleFS, "/index.html");
       return;
     }
     
@@ -1080,13 +1115,15 @@ void setupAPServer() {
     
     settings.updateNow();
 
-    request->send(SPIFFS, "/submit.html");
+    request->send(LittleFS, "/submit.html");
 
     delay(100);
 
     ESP.restart();
   });
 
+  //Serial.printf("Free Heap: %d bytes\n", ESP.getFreeHeap());
+  //Serial.println("CP Begin");
   serverAP.begin();
 }
 
@@ -1164,13 +1201,7 @@ void otaInit() {
   ArduinoOTA.begin();
 }
 
-//Инициализация сети
-void networkInit() {
-  WiFi.softAPdisconnect();
-  WiFi.disconnect();
-  ArduinoOTA.end();
-  dnsServer.stop();
-
+void getLocalUID() {
   const uint64_t chipId = ESP.getEfuseMac();
   snprintf(uid, sizeof(uid), "%02X%02X%02X%02X%02X%02X",
     (uint8_t)(chipId),
@@ -1180,7 +1211,17 @@ void networkInit() {
     (uint8_t)(chipId >> 32),
     (uint8_t)(chipId >> 40)
   );
-  Serial.println(uid);
+  //Serial.println(uid);
+}
+
+//Инициализация сети
+void networkInit() {
+  WiFi.softAPdisconnect();
+  WiFi.disconnect();
+  ArduinoOTA.end();
+  dnsServer.stop();
+
+  getLocalUID();
 
   if (data.wifi_mode) beginAP();
   else connectToWiFi();
@@ -1208,10 +1249,20 @@ void ledStripeInit() {
   FastLED.setBrightness(data.bright);
 }
 
-void spiffsBegin() {
-  if (!SPIFFS.begin(true)){
-    Serial.println("An error has occurred while mounting SPIFFS");
-    return;
+void LittleFSBegin() {
+  if (LittleFS.begin(true)) {
+    /*
+    Serial.println("--- Список файлов в LittleFS: ---");
+    File root = LittleFS.open("/");
+    File file = root.openNextFile();
+    while(file){
+      Serial.printf("Файл: %s, Размер: %d байт\n", file.name(), file.size());
+      file = root.openNextFile();
+    }
+    Serial.println("-------------------------------");
+    */
+  } else {
+    Serial.println("Ошибка монтирования LittleFS!");
   }
 
   switch (settings.read()) {
@@ -1247,7 +1298,7 @@ void setup() {
   pinMode(IDICATE_PIN, OUTPUT);
   digitalWrite(IDICATE_PIN, LOW);
 
-  spiffsBegin();
+  LittleFSBegin();
 
   #ifdef ENABLE_BUTTON 
   buttonCheck();

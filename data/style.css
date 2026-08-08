@@ -1,0 +1,51 @@
+* {
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    background-color: rgb(39, 39, 39);
+    color: #fff;
+}
+
+form {
+    font-size: larger;
+    font-weight: 900;
+    text-align: center;
+    margin-top: 70px;
+}
+
+#ssid_input {
+  background: #fff;
+  border-radius: 30px;
+  scale: 1.2;
+  margin-left: 20px;
+  border: none;
+  padding: 5px;
+}
+
+#password_input {
+    background: #fff;
+    border-radius: 30px;
+    scale: 1.2;
+    margin-left: 20px;
+    border: none;
+    padding: 5px;
+}
+
+.btn {
+    background: #DC7000;
+    border: none;
+    padding: 10px 25px;
+    color: #fff;
+    font-size: large;
+    border-radius: 25px;
+    transition: all 700ms ease;
+}
+
+.btn:hover {
+    background: #fff;
+    color: #DC7000;
+    transform: scale(1.4);
+    margin-top: 5px;
+}
