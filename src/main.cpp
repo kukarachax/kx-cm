@@ -14,6 +14,7 @@ bool wifi_saved = false;
 uint8_t newBright = data.bright;
 bool newPowerState = data.powerState;
 bool newPowerType = data.powerType;
+bool pair_enable = false;
 // ------------------------------------------------------
 
 void ledStripeInit() {
@@ -44,12 +45,11 @@ void LittleFSBegin() {
   }
 }
 
-void buttonCheck() {
+void buttonCheckOnStart() {
   if (digitalRead(BUTTON_PIN)) return;
   data.powerType = false;
   settings.updateNow();
 }
-
 
 
 void setup() {
@@ -65,7 +65,7 @@ void setup() {
   LittleFSBegin();
 
   #ifdef ENABLE_BUTTON 
-  buttonCheck();
+  buttonCheckOnStart();
   #endif
 
   xTaskCreatePinnedToCore(
@@ -84,9 +84,92 @@ void setup() {
   Serial.println("Setup end");
 }
 
+
+const uint DEBOUNCE_DELAY = 50;  // Защита от дребезга контактов
+const uint CLICK_DELAY = 250;     // Время ожидания второго клика
+const uint HOLD_DELAY = 800;      // Время до фиксации удержания
+uint32_t pairflag_tmr; 
+bool lastButtonState = HIGH;
+bool currentButtonState = HIGH;
+uint32_t lastDebounceTime = 0;
+uint32_t buttonPressedTime = 0;
+bool isWaitingForClick = false;
+bool isHolding = false;
+int clickCount = 0;
+void checkButton() {
+  // Чтение текущего физического состояния пина
+  bool reading = digitalRead(BUTTON_PIN);
+  uint32_t currentTime = millis();
+
+  // 1. Фильтрация дребезга контактов
+  if (reading != lastButtonState) 
+    lastDebounceTime = currentTime;
+
+  if ((currentTime - lastDebounceTime) > DEBOUNCE_DELAY) {
+    // Если состояние стабилизировалось
+    if (reading != currentButtonState) {
+      currentButtonState = reading;
+
+      // Кнопка нажата
+      if (currentButtonState == LOW) {
+        buttonPressedTime = currentTime;
+        isHolding = false;
+        clickCount++;
+        isWaitingForClick = true;
+      } 
+      
+      else {
+        if (isHolding) {
+          isHolding = false;
+          clickCount = 0; 
+          isWaitingForClick = false;
+        }
+      }
+    }
+  }
+
+  // Логика удержания (Hold)
+  if (currentButtonState == LOW && !isHolding) {
+    if ((currentTime - buttonPressedTime) > HOLD_DELAY) {
+      isHolding = true;
+      pair_enable = true;
+      pairflag_tmr = millis();
+    }
+  }
+
+  // Логика одиночного и двойного клика
+  if (isWaitingForClick && currentButtonState == HIGH) {
+    if ((currentTime - buttonPressedTime) > CLICK_DELAY) {
+      if (clickCount == 1) {  // Вызов события одиночного клика
+        newPowerState = !newPowerState; 
+      } 
+      else if (clickCount == 2) { // Вызов события двойного клика
+        if (data.mode >= TOTAL_MODES) 
+          data.mode = 0;  
+        else 
+          data.mode++;          
+      }
+      settings.update();
+      clickCount = 0;
+      isWaitingForClick = false;
+    }
+  }
+  lastButtonState = reading;
+}
+
+void handlePairing() {
+  if (millis() - pairflag_tmr > 60000 && pair_enable) 
+    pair_enable = false;
+  
+}
+
+
 void loop() { 
   computeSound();
   animation();
+
+  handlePairing();
+  checkButton();
 
   handlePowerType();
   handlePowerState();

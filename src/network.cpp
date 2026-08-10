@@ -52,7 +52,8 @@ void sendDataToApp() {
 
 void startPairing() { 
   char str_buf[strlen(NETWORK_KEY) + 13 + 5];
-  snprintf(str_buf, sizeof(str_buf), "CM/%s:%s", NETWORK_KEY, uid);
+  snprintf(str_buf, sizeof(str_buf), "CM/%s/%s", NETWORK_KEY, uid);
+  
   udpSend(str_buf, true);
 }
 
@@ -119,17 +120,55 @@ float getNewVar(String nData) {
   return nData.substring(nData.indexOf("=") + 1).toFloat(); 
 }
 
+void restartESP(uint8_t nMode = 0) {
+  switch (nMode) {
+  case 0: ESP.restart();
+    break;
+  case 1: 
+    data.wifi_mode = true;
+    settings.updateNow();
+    settings.tick();
+    delay(50);
+    ESP.restart();
+    break;
+  case 2: 
+    data.wifi_mode = false;
+    settings.updateNow();
+    settings.tick();
+    delay(50);
+    ESP.restart();
+    break;
+  case 3:
+    settings.reset();
+    settings.tick();
+    delay(50);
+    ESP.restart();
+    break;
+  case 4:
+    data.WIFI_SSID = "";
+    data.WIFI_PASS = "";
+    settings.updateNow();
+    settings.tick();
+    delay(50);
+    ESP.restart();
+    break;
+  
+  default:
+    break;
+  }
+}
+
 void updateData(String newData) {
   const int paramNum = getParamNumber(newData);
   switch (paramNum) {
     case -1: return; 
     case 0: sendDataToApp(); break;
     case 1: updateLowPass(); break;
-    case 2: ESP.restart(); break;
-    case 3: ESP.restart(); break;
-    case 4: ESP.restart(); break;
-    case 5: ESP.restart(); break;
-    case 6: ESP.restart(); break;
+    case 2: restartESP(1); break;
+    case 3: restartESP(2); break;
+    case 4: restartESP(); break;
+    case 5: restartESP(3); break;
+    case 6: restartESP(4); break;
     case 7: data.portAux = getNewVar(newData); break;
     case 8: newPowerState = getNewVar(newData); break;
     case 9: newPowerType = getNewVar(newData); break;
@@ -203,7 +242,7 @@ bool udpCheckNetKey(char buff[MAX_UDP_PACKET_SIZE]) {
   return false;
 }
 
-bool checkPairRequest(char buff[MAX_UDP_PACKET_SIZE]) { 
+bool checkPairRequest(char buff[MAX_UDP_PACKET_SIZE]) {
   for (int i = 0; i < strlen(PAIR_KEY) - 1; i++) 
     if (buff[i] != PAIR_KEY[i]) return false;
   return true;
@@ -214,7 +253,7 @@ void udpListen() {
   char udpBuffer[MAX_UDP_PACKET_SIZE];
   int udpBufferSize = udp.read(udpBuffer, MAX_UDP_PACKET_SIZE);
   
-  if (checkPairRequest(udpBuffer)) { 
+  if (checkPairRequest(udpBuffer) && pair_enable) { 
     startPairing(); 
     return; 
   }

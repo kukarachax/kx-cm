@@ -38,14 +38,14 @@ void updateLowPass() {
   int maxNoiseLevel = 0, noiseLevel = 0;
   fill_leds(0, 5, CRGB::Pink);
 
-  for (int i = 0; i < 500; i++) {
+  for (int i = 0; i < 5000; i++) {
     noiseLevel = analogRead(soundRList[data.portAux]);        
     if (noiseLevel > maxNoiseLevel) maxNoiseLevel = noiseLevel;                                             
   }
   lowPassVolume = maxNoiseLevel + data.addNoiseLPVolume;
   maxNoiseLevel = 0;
 
-  for (int i = 0; i < 500; i++) {
+  for (int i = 0; i < 5000; i++) {
     getFFT();
     for (uint8_t j = 3; j < 28; j++) 
       if (spectr[j] > maxNoiseLevel) maxNoiseLevel = spectr[j];
@@ -343,6 +343,11 @@ void animation() {
   } else {
     FastLED.clear(); FastLED.setBrightness(0);
   }
+
+  if (pair_enable) 
+    fill_leds(0, 5, CRGB::White, false);
+  
+
   FastLED.show();
 }
 
