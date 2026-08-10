@@ -43,6 +43,10 @@ void LittleFSBegin() {
     case FD_READ: Serial.println("Data Read"); break;
     case FD_NO_DIF: Serial.println("FD_NO_DIF"); break;
   }
+
+  newBright = data.bright;
+  newPowerState = data.powerState; 
+  newPowerType = data.powerType;
 }
 
 void buttonCheckOnStart() {
