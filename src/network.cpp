@@ -10,7 +10,7 @@
 IPAddress broadcastIP, this_ip;
 AsyncWebServer serverAP(80);
 DNSServer dnsServer;
-WiFiUDP udp, pairUdp;
+WiFiUDP udp;
 
 void getBroadcastIp() {
   broadcastIP = WiFi.localIP();
@@ -28,26 +28,27 @@ void udpSend(char *buf, bool broadcast = false) {
 void sendDataToApp() {
   String dataBuffer = String(NETWORK_KEY);
   #define addStr(t) dataBuffer = dataBuffer + t + ";"
-  addStr(data.portAux); addStr(data.powerState); addStr(data.mode); addStr(data.emptyBright); 
-  addStr(data.bright); addStr(data.emptyColor); addStr(data.volumePalette); 
-  addStr(data.freqColors[0]); addStr(data.freqColors[1]); addStr(data.freqColors[2]); 
-  addStr(data.hueStart); addStr(data.hueStep); addStr(data.staticColorHue); 
-  addStr(data.staticColorSat); addStr(data.fireHueGap); addStr(data.fireStep); 
-  addStr(data.fireHueStart); addStr(data.fireMinBrightness); addStr(data.fireMinSaturation); 
-  addStr(data.fireMaxSaturation); addStr(data.pulseColorPulseHue); addStr(data.pulseColorPulseSat); 
-  addStr(data.addNoiseLPVolume); addStr(data.addNoiseLPSpectr); addStr(data.maxCurrent); 
-  addStr(data.maxCurrentPowerbank); addStr(data.volumeSmooth); addStr(data.SmoothFreq); 
-  addStr(data.MaxCoefFreq); addStr(data.runningFreqSpeed); addStr(data.strobe1FreqSpeed); 
-  addStr(data.strobe5FreqSpeed); addStr(data.runningRainbowSpeed); addStr(data.runningRainbowStep); 
-  addStr(data.fadeRainbowSpeed); addStr(data.runningRusFlagSpeed); addStr(data.strobeWhiteSpeed); 
-  addStr(data.strobeRGBSpeed); addStr(data.partyModeSideSpeed); addStr(data.addNoiseLPVolume);
-  addStr(data.addNoiseLPSpectr); addStr(data.powerType);
+    addStr(data.portAux); addStr(data.powerState); addStr(data.mode); addStr(data.emptyBright); 
+    addStr(data.bright); addStr(data.emptyColor); addStr(data.volumePalette); 
+    addStr(data.freqColors[0]); addStr(data.freqColors[1]); addStr(data.freqColors[2]); 
+    addStr(data.hueStart); addStr(data.hueStep); addStr(data.staticColorHue); 
+    addStr(data.staticColorSat); addStr(data.fireHueGap); addStr(data.fireStep); 
+    addStr(data.fireHueStart); addStr(data.fireMinBrightness); addStr(data.fireMinSaturation); 
+    addStr(data.fireMaxSaturation); addStr(data.pulseColorPulseHue); addStr(data.pulseColorPulseSat); 
+    addStr(data.addNoiseLPVolume); addStr(data.addNoiseLPSpectr); addStr(data.maxCurrent); 
+    addStr(data.maxCurrentPowerbank); addStr(data.volumeSmooth); addStr(data.SmoothFreq); 
+    addStr(data.MaxCoefFreq); addStr(data.runningFreqSpeed); addStr(data.strobe1FreqSpeed); 
+    addStr(data.strobe5FreqSpeed); addStr(data.runningRainbowSpeed); addStr(data.runningRainbowStep); 
+    addStr(data.fadeRainbowSpeed); addStr(data.runningRusFlagSpeed); addStr(data.strobeWhiteSpeed); 
+    addStr(data.strobeRGBSpeed); addStr(data.partyModeSideSpeed); addStr(data.addNoiseLPVolume);
+    addStr(data.addNoiseLPSpectr); addStr(data.powerType);
+  #undef addStr
 
-  if (WiFi.getMode() == WIFI_STA) udp.beginPacket(broadcastIP, UDP_PORT_SEND);
-  else udp.beginPacket(this_ip, UDP_PORT_SEND);
+  udp.beginPacket(this_ip, UDP_PORT_SEND);
+
   udp.print(dataBuffer);
   udp.endPacket();
-  #undef addStr
+  
 }
 
 void startPairing() { 
@@ -105,8 +106,7 @@ const String genParsName[] = {
   "pulseColorPulseHue=",
   "pulseColorPulseSat=",
   "strobeWhiteSpeed=",
-  "bright=",
-  "GETUID"
+  "bright="
 };
 int arraySize = sizeof(genParsName) / sizeof(genParsName[0]); 
 
@@ -163,7 +163,7 @@ void updateData(String newData) {
   switch (paramNum) {
     case -1: return; 
     case 0: sendDataToApp(); break;
-    case 1: updateLowPass(); break;
+    case 1: lowpass_trigger = true; break;
     case 2: restartESP(1); break;
     case 3: restartESP(2); break;
     case 4: restartESP(); break;
@@ -277,22 +277,37 @@ void setupCaptivePortal(const IPAddress locIP) {
 }
 
 void setupAPServer() {
-  serverAP.onNotFound([](AsyncWebServerRequest *request) { request->send(LittleFS, "/index.html"); });
-  serverAP.on("/style.css", HTTP_GET, [](AsyncWebServerRequest *request){ request->send(LittleFS, "/style.css"); });
+  serverAP.onNotFound([](AsyncWebServerRequest *request) { 
+    request->send(LittleFS, "/index.html"); 
+  });
+  serverAP.on("/style.css", HTTP_GET, [](AsyncWebServerRequest *request){ 
+    request->send(LittleFS, "/style.css"); 
+  });
   serverAP.on("/continue", HTTP_POST, [](AsyncWebServerRequest *request){
-    request->send(LittleFS, "/submit.html"); delay(100); return;
+    request->send(LittleFS, "/submit.html"); 
+    delay(100); 
+    return;
   });
   serverAP.on("/done", HTTP_POST, [](AsyncWebServerRequest *request) {
     String receivedSsid, receivedPassword;
-    if (request->hasParam("ssid", true)) receivedSsid = request->getParam("ssid", true)->value();
-    if (request->hasParam("password", true)) receivedPassword = request->getParam("password", true)->value();
-    if (receivedSsid == "") { request->send(LittleFS, "/index.html"); return; }
+    if (request->hasParam("ssid", true)) 
+      receivedSsid = request->getParam("ssid", true)->value();
+
+    if (request->hasParam("password", true))
+      receivedPassword = request->getParam("password", true)->value();
+
+    if (receivedSsid == "") { 
+      request->send(LittleFS, "/index.html"); 
+      return; 
+    }
     
     data.WIFI_SSID = receivedSsid;
     data.WIFI_PASS = receivedPassword;
+    data.wifi_saved_flag = true;
     settings.updateNow();
     request->send(LittleFS, "/submit.html");
     delay(100);
+
     ESP.restart();
   });
   serverAP.begin();
@@ -313,7 +328,7 @@ void beginAP() {
   delay(1000);
   Serial.println(WiFi.softAPIP());
 
-  if (!wifi_saved || !data.wifi_mode) setupCaptivePortal(localIP);
+  if (!data.wifi_saved_flag || !data.wifi_mode) setupCaptivePortal(localIP);
   setupAPServer();
   digitalWrite(IDICATE_PIN, HIGH);
 }
@@ -327,20 +342,23 @@ void connectToWiFi() {
   while (WiFi.status() != WL_CONNECTED) {
     if (millis() - wifi_timer > 1000) {
       wifi_timer = millis();
+
       fill_leds(0, map(counter, 0, WIFI_CONNECTION_TRYS, 1, NUM_LEDS), CRGB::Yellow, false);
       counter++;
+
       if (counter == WIFI_CONNECTION_TRYS) {
         fill_leds(0, (NUM_LEDS / 10), CRGB::Red);
-        delay(1000);
-        wifi_saved = false; 
+        data.wifi_saved_flag = false; 
         settings.updateNow();
+        delay(1000);
+
         beginAP();
         return;
       } 
     }
   }
   fill_leds(0, (NUM_LEDS / 10), CRGB::Green);
-  wifi_saved = true; 
+  data.wifi_saved_flag = true; 
   settings.updateNow();
 }
 
@@ -357,7 +375,6 @@ void getLocalUID() {
     (uint8_t)(chipId), (uint8_t)(chipId >> 8), (uint8_t)(chipId >> 16),
     (uint8_t)(chipId >> 24), (uint8_t)(chipId >> 32), (uint8_t)(chipId >> 40)
   );
-  Serial.println(uid);
 }
 
 void networkInit() {
@@ -367,7 +384,7 @@ void networkInit() {
   dnsServer.stop();
   getLocalUID();
 
-  if (data.wifi_mode) beginAP();
+  if (data.wifi_mode || !data.wifi_saved_flag) beginAP();
   else connectToWiFi();
 
   getBroadcastIp();
@@ -384,6 +401,7 @@ void Core0Handler(void *pvParameters) {
     dnsServer.processNextRequest();
     ArduinoOTA.handle();
     udpListen();
+    handleIR();
 
     vTaskDelay(pdMS_TO_TICKS(5));
   }

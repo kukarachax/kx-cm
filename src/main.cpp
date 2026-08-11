@@ -7,14 +7,26 @@ const char PAIR_KEY[] = "KXPD";
 
 Settings data;
 FileData settings(&LittleFS, "/settings.dat", 'B', &data, sizeof(data), 1500);
+
 CRGB leds[NUM_LEDS];
 TaskHandle_t Core0TaskHandle;
 char uid[13];
-bool wifi_saved = false;
-uint8_t newBright = data.bright;
-bool newPowerState = data.powerState;
-bool newPowerType = data.powerType;
+uint8_t newBright;
+bool newPowerState;
+bool newPowerType;
 bool pair_enable = false;
+bool lowpass_trigger = false;
+const uint DEBOUNCE_DELAY = 50;  // Защита от дребезга контактов
+const uint CLICK_DELAY = 250;     // Время ожидания второго клика
+const uint HOLD_DELAY = 3000;      // Время до фиксации удержания
+uint32_t pairflag_tmr; 
+bool lastButtonState = HIGH;
+bool currentButtonState = HIGH;
+uint32_t lastDebounceTime = 0;
+uint32_t buttonPressedTime = 0;
+bool isWaitingForClick = false;
+bool isHolding = false;
+int clickCount = 0;
 // ------------------------------------------------------
 
 void ledStripeInit() {
@@ -55,7 +67,6 @@ void buttonCheckOnStart() {
   settings.updateNow();
 }
 
-
 void setup() {
   Serial.begin(115200);
   esp_log_level_set("WiFiUdp", ESP_LOG_NONE); 
@@ -64,13 +75,12 @@ void setup() {
   pinMode(SOUND_R_2, INPUT);
   pinMode(BUTTON_PIN, INPUT_PULLUP);
   pinMode(IDICATE_PIN, OUTPUT);
+  //pinMode(IR_PIN, INPUT_PULLUP);
   digitalWrite(IDICATE_PIN, LOW);
 
   LittleFSBegin();
 
-  #ifdef ENABLE_BUTTON 
   buttonCheckOnStart();
-  #endif
 
   xTaskCreatePinnedToCore(
     Core0Handler,         /* Функция задачи */
@@ -83,23 +93,14 @@ void setup() {
 
   ledStripeInit();
   networkInit();
-  updateLowPass();
+  updateLowPass(1);
+  beginIR();
 
   Serial.println("Setup end");
 }
 
 
-const uint DEBOUNCE_DELAY = 50;  // Защита от дребезга контактов
-const uint CLICK_DELAY = 250;     // Время ожидания второго клика
-const uint HOLD_DELAY = 800;      // Время до фиксации удержания
-uint32_t pairflag_tmr; 
-bool lastButtonState = HIGH;
-bool currentButtonState = HIGH;
-uint32_t lastDebounceTime = 0;
-uint32_t buttonPressedTime = 0;
-bool isWaitingForClick = false;
-bool isHolding = false;
-int clickCount = 0;
+
 void checkButton() {
   // Чтение текущего физического состояния пина
   bool reading = digitalRead(BUTTON_PIN);

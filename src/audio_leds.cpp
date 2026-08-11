@@ -34,23 +34,27 @@ void getFFT() {
   FFT(raw, spectr);
 } 
 
-void updateLowPass() {
-  int maxNoiseLevel = 0, noiseLevel = 0;
-  fill_leds(0, 5, CRGB::Pink);
+void updateLowPass(const bool force_trigger) {
+  if (force_trigger || lowpass_trigger) {
+    int maxNoiseLevel = 0, noiseLevel = 0;
+    fill_leds(0, 5, CRGB::Pink);
 
-  for (int i = 0; i < 5000; i++) {
-    noiseLevel = analogRead(soundRList[data.portAux]);        
-    if (noiseLevel > maxNoiseLevel) maxNoiseLevel = noiseLevel;                                             
-  }
-  lowPassVolume = maxNoiseLevel + data.addNoiseLPVolume;
-  maxNoiseLevel = 0;
+    for (int i = 0; i < 1500; i++) {
+      noiseLevel = analogRead(soundRList[data.portAux]);        
+      if (noiseLevel > maxNoiseLevel) maxNoiseLevel = noiseLevel;                                             
+    }
+    lowPassVolume = maxNoiseLevel + data.addNoiseLPVolume;
+    maxNoiseLevel = 0;
 
-  for (int i = 0; i < 5000; i++) {
-    getFFT();
-    for (uint8_t j = 3; j < 28; j++) 
-      if (spectr[j] > maxNoiseLevel) maxNoiseLevel = spectr[j];
+    for (int i = 0; i < 1500; i++) {
+      getFFT();
+      for (uint8_t j = 3; j < 28; j++) 
+        if (spectr[j] > maxNoiseLevel) maxNoiseLevel = spectr[j];
+    }
+    lowPassSpectr = maxNoiseLevel + data.addNoiseLPSpectr;
+
+    lowpass_trigger = false;
   }
-  lowPassSpectr = maxNoiseLevel + data.addNoiseLPSpectr;
 }
 
 void filterFFT() {
@@ -314,8 +318,12 @@ bool strobeWhite_counter;
 void strobeWhiteAnimate() {
   if (millis() - strobeWhite_timer > data.strobeWhiteSpeed) {
     strobeWhite_timer = millis();
-    if (strobeWhite_counter) fill_solid(leds, NUM_LEDS, CRGB::White);
-    else fill_solid(leds, NUM_LEDS, CRGB::Black);
+    
+    if (strobeWhite_counter) 
+      fill_solid(leds, NUM_LEDS, CRGB::White);
+    else 
+      fill_solid(leds, NUM_LEDS, CRGB::Black);
+
     strobeWhite_counter = !strobeWhite_counter;
   }
 }

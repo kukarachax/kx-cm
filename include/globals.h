@@ -8,14 +8,13 @@
 // --- НАСТРОЙКИ ---
 #define TOTAL_MODES 13
 
-#define ENABLE_BUTTON
 #define TOTAL_LEDS 86
 #define LED_PIN 22
 #define SOUND_R_1 35
 #define SOUND_R_2 34
 #define IDICATE_PIN 2
 #define BUTTON_PIN 12
-#define IR_PIN 4
+#define IR_PIN 27
 
 #define LED_CHIP WS2812
 #define LED_COLOR GRB
@@ -105,14 +104,16 @@ struct Settings {
 
   int addNoiseLPVolume = 0;  // Добавочная величина к порогу шума Volume
   int addNoiseLPSpectr = 0;  // Добавочная величина к порогу шума Spectr
+
+  bool wifi_saved_flag = false;
 };
 
 extern Settings data;
 extern FileData settings;
 extern CRGB leds[NUM_LEDS];
 extern char uid[13];
-extern bool wifi_saved;
 extern bool pair_enable;
+extern bool lowpass_trigger;
 extern uint8_t newBright;
 extern bool newPowerState;
 extern bool newPowerType; 
@@ -120,7 +121,7 @@ extern bool newPowerType;
 // --- ОБЪЯВЛЕНИЯ ФУНКЦИЙ ---
 // Из audio_leds.cpp
 void fill_leds(const int from, const int to, CRGB color, const bool clr = true);
-void updateLowPass();
+void updateLowPass(const bool force_trigger = false);
 void computeSound();
 void animation();
 void handlePowerType();
@@ -130,3 +131,6 @@ void handleBright();
 // Из network.cpp
 void networkInit();
 void Core0Handler(void *pvParameters);
+
+void handleIR();
+void beginIR();
