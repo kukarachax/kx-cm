@@ -172,6 +172,7 @@ void handlePairing() {
 void loop() { 
   computeSound();
   animation();
+  updateLowPass();
 
   handlePairing();
   checkButton();

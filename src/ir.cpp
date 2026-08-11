@@ -29,36 +29,65 @@ IRrecv ir(IR_PIN);
 #define CODE_DOWN 0x33B8609F
 #define CODE_EXIT 0x33B8C03F
 #define CODE_MENU 0x33B840BF
+#define CODE_REPEAT 0xFFFFFFFF
 
 
 void beginIR() {
   ir.enableIRIn();
 }
 
+uint32_t ir_tmr;
+uint64_t last_valid_code = 0;
 void handleIR() {
   if (!ir.decode(&results)) return;
-  
-  //Serial.print("0x");
-  //Serial.println(results.value, HEX);
 
-  switch (results.value) {
+  // Если с момента последней команды прошло много времени, сбрасываем память повтора
+  if (millis() - ir_tmr > 250) {
+    last_valid_code = 0;
+  }
+
+  // Ограничение по частоте обработки (не чаще 100 мс)
+  if (millis() - ir_tmr < 200) {
+    ir.resume();
+    return;
+  }
+
+  uint64_t this_code = results.value;
+
+  // Обработка кода повтора NEC
+  if (this_code == CODE_REPEAT || results.repeat) {
+    if (last_valid_code != 0) {
+      this_code = last_valid_code; // Подменяем повтор на реальную кнопку
+    } 
+    else {
+      ir.resume();
+      return;
+    }
+  } else if (this_code != 0) {
+    last_valid_code = this_code; // Запоминаем новую кнопку
+  }
+
+  ir_tmr = millis();
+  bool updFlag = true;
+
+  switch (this_code) {
   case POWER_CODE:
     newPowerState = !newPowerState;
     break;
   case CODE_LEFT:
-    if (newBright == 0) return;
-    else newBright-=2;
+    if (newBright <= 11) newBright = 0;
+    else newBright -= 10;
     break;
   case CODE_RIGHT:
-    if (newBright >= 255) return;
-    else newBright+=2;
+    if (newBright >= 246) newBright = 255;
+    else newBright += 10;
     break;
   case CODE_UP:
-    if (data.mode >= TOTAL_MODES) return;
+    if (data.mode >= TOTAL_MODES) break;
     else data.mode++;
     break;
   case CODE_DOWN:
-    if (data.mode == 0) return;
+    if (data.mode <= 0) break;
     else data.mode--;
     break;
   case CODE_RECALL:
@@ -67,15 +96,13 @@ void handleIR() {
   case CODE_GOTO:
     data.portAux = !data.portAux;
     break;
-  case CODE_EXIT:
-    ESP.restart();
-    break;
   default:
-    ir.resume();
-    return;
+    updFlag = false;
     break;
   }
 
   ir.resume();
-  settings.update();
+  if (updFlag) {
+    settings.update();
+  }
 }
