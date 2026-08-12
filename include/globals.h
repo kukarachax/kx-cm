@@ -7,8 +7,7 @@
 
 // --- НАСТРОЙКИ ---
 #define TOTAL_MODES 13
-
-#define TOTAL_LEDS 86
+#define TOTAL_LEDS 180
 #define LED_PIN 22
 #define SOUND_R_1 35
 #define SOUND_R_2 34

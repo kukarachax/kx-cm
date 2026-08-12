@@ -1,4 +1,5 @@
 #include "globals.h"
+#include "udp_audio.h"
 #include <WiFi.h>
 #include <WiFiUdp.h>
 #include <AsyncTCP.h>
@@ -388,6 +389,7 @@ void networkInit() {
   else connectToWiFi();
 
   getBroadcastIp();
+  initUDPAudio();
   udp.begin(UDP_PORT_LISTEN);
   otaInit();
   delay(500);
@@ -401,9 +403,10 @@ void Core0Handler(void *pvParameters) {
     dnsServer.processNextRequest();
     ArduinoOTA.handle();
     udpListen();
+    handleUDPAudio();
     handleIR();
 
-    vTaskDelay(pdMS_TO_TICKS(5));
+    vTaskDelay(pdMS_TO_TICKS(2));
   }
   
 }

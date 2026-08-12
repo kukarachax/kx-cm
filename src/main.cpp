@@ -75,7 +75,6 @@ void setup() {
   pinMode(SOUND_R_2, INPUT);
   pinMode(BUTTON_PIN, INPUT_PULLUP);
   pinMode(IDICATE_PIN, OUTPUT);
-  //pinMode(IR_PIN, INPUT_PULLUP);
   digitalWrite(IDICATE_PIN, LOW);
 
   LittleFSBegin();

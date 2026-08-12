@@ -1,4 +1,5 @@
 #include "globals.h"
+#include "udp_audio.h"
 #include <FFT_C.h>
 
 int spectr[FFT_SIZE];
@@ -27,12 +28,21 @@ void fill_leds(const int from, const int to, CRGB color, const bool clr) {
 }
 
 
+uint16_t readAudioSample() {
+    if (data.portAux == 1) {
+        return getNextAudioSample(); // Чтение из UDP
+    } else {
+        return analogRead(soundRList[data.portAux]); // Чтение с пина ADC[cite: 3]
+    }
+}
 
 void getFFT() {
   int raw[FFT_SIZE];
-  for (int i = 0; i < FFT_SIZE; i++) raw[i] = analogRead(soundRList[data.portAux]);
+  for (int i = 0; i < FFT_SIZE; i++) {
+      raw[i] = readAudioSample(); // Замена analogRead на readAudioSample[cite: 3]
+  }
   FFT(raw, spectr);
-} 
+}
 
 void updateLowPass(const bool force_trigger) {
   if (force_trigger || lowpass_trigger) {
@@ -40,10 +50,10 @@ void updateLowPass(const bool force_trigger) {
     fill_leds(0, 5, CRGB::Pink);
 
     for (int i = 0; i < 1500; i++) {
-      noiseLevel = analogRead(soundRList[data.portAux]);        
+      noiseLevel = readAudioSample(); // Замена analogRead на readAudioSample[cite: 3]
       if (noiseLevel > maxNoiseLevel) maxNoiseLevel = noiseLevel;                                             
     }
-    lowPassVolume = maxNoiseLevel + data.addNoiseLPVolume;
+    lowPassVolume = maxNoiseLevel + data.addNoiseLPVolume; //[cite: 3]
     maxNoiseLevel = 0;
 
     for (int i = 0; i < 1500; i++) {
@@ -51,7 +61,7 @@ void updateLowPass(const bool force_trigger) {
       for (uint8_t j = 3; j < 28; j++) 
         if (spectr[j] > maxNoiseLevel) maxNoiseLevel = spectr[j];
     }
-    lowPassSpectr = maxNoiseLevel + data.addNoiseLPSpectr;
+    lowPassSpectr = maxNoiseLevel + data.addNoiseLPSpectr; //[cite: 3]
 
     lowpass_trigger = false;
   }
@@ -90,27 +100,27 @@ void filterFFT() {
 }
 
 void filterVolume() {
-  #define MAX_COEF 1.8
+  #define MAX_COEF 1.8 //[cite: 3]
   float RsoundLevel = 0, LsoundLevel = 0;
 
   for (uint8_t i = 0; i < 100; i ++) {                     
-    RcurrentLevel = analogRead(soundRList[data.portAux]);
+    RcurrentLevel = readAudioSample(); // Замена analogRead на readAudioSample[cite: 3]
     if (RsoundLevel < RcurrentLevel) RsoundLevel = RcurrentLevel;
   }
-  RsoundLevel = constrain(map(RsoundLevel, lowPassVolume, ADC_BITS, 0, 500), 0, 500); 
-  RsoundLevel = pow(RsoundLevel, data.EXP); 
-  RsoundLevel_f = RsoundLevel * data.volumeSmooth + RsoundLevel_f * (1 - data.volumeSmooth);
-  LsoundLevel_f = RsoundLevel_f;
+  RsoundLevel = constrain(map(RsoundLevel, lowPassVolume, ADC_BITS, 0, 500), 0, 500); //[cite: 3, 5]
+  RsoundLevel = pow(RsoundLevel, data.EXP); //[cite: 3]
+  RsoundLevel_f = RsoundLevel * data.volumeSmooth + RsoundLevel_f * (1 - data.volumeSmooth); //[cite: 3]
+  LsoundLevel_f = RsoundLevel_f; //[cite: 3]
 
   if (data.emptyBright > 5) {
-    for (int i = 0; i < NUM_LEDS; i++) leds[i] = CHSV(data.emptyColor, 255, data.emptyBright); 
+    for (int i = 0; i < NUM_LEDS; i++) leds[i] = CHSV(data.emptyColor, 255, data.emptyBright); //[cite: 3]
   }
 
-  if (RsoundLevel_f > 15 && LsoundLevel_f > 15) {
-    averageLevel = (float)(RsoundLevel_f + LsoundLevel_f) / 2 * averK + averageLevel * (1 - averK);
-    maxLevel = (float)averageLevel * MAX_COEF;
-    Rlenght = constrain(map(RsoundLevel_f, 0, maxLevel, 0, HALF_LED), 0, HALF_LED);
-    Llenght = constrain(map(LsoundLevel_f, 0, maxLevel, 0, HALF_LED), 0, HALF_LED);
+  if (RsoundLevel_f > 15 && LsoundLevel_f > 15) { //[cite: 3]
+    averageLevel = (float)(RsoundLevel_f + LsoundLevel_f) / 2 * averK + averageLevel * (1 - averK); //[cite: 3]
+    maxLevel = (float)averageLevel * MAX_COEF; //[cite: 3]
+    Rlenght = constrain(map(RsoundLevel_f, 0, maxLevel, 0, HALF_LED), 0, HALF_LED); //[cite: 3]
+    Llenght = constrain(map(LsoundLevel_f, 0, maxLevel, 0, HALF_LED), 0, HALF_LED); //[cite: 3]
   }
   #undef MAX_COEF
 }
