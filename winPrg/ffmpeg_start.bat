@@ -1,1 +1,0 @@
-ffmpeg -f dshow -i audio="Microphone (2- High Definition Audio Device)" -ac 1 -ar 22050 -f s16le udp://192.168.2.61:5390
