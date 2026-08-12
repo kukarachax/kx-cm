@@ -280,7 +280,7 @@ int shift_index(int current_index, int delta, int leds_count) { return (current_
 void runningRusFlagAnimate() { 
   if (millis() - runningRusFlag_timer > data.runningRusFlagSpeed) {
     runningRusFlag_timer = millis();
-    if (runningRusFlag_idex++ >= NUM_LEDS) runningRusFlag_idex = 0;
+    if (++runningRusFlag_idex >= NUM_LEDS) runningRusFlag_idex = 0;
     int delta = NUM_LEDS / 3;
     int whiteIndex = runningRusFlag_idex;
     int blueIndex = shift_index(whiteIndex, delta, NUM_LEDS);
@@ -308,6 +308,10 @@ void strobeRGBAnimate() {
 void pulseColorAnimate() {
   static bool direct = false;
   static uint8_t iBright = 0;
+  if (data.bright == 0) {
+    fill_solid(leds, NUM_LEDS, CRGB::Black);
+    return;
+  }
   if (direct) { if (++iBright >= data.bright) direct = !direct; }
   else { if (--iBright < 1) direct = !direct; }
   for (int i = 0 ; i < NUM_LEDS; i++) leds[i] = CHSV(data.pulseColorPulseHue, data.pulseColorPulseSat, iBright);
