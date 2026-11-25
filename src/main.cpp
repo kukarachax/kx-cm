@@ -12,6 +12,7 @@ CRGB leds[NUM_LEDS];
 TaskHandle_t Core0TaskHandle;
 char uid[13];
 uint8_t newBright;
+bool apMode = false;
 bool newPowerState;
 bool newPowerType;
 bool pair_enable = false;

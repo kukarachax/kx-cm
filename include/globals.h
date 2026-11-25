@@ -7,12 +7,12 @@
 
 // --- НАСТРОЙКИ ---
 #define TOTAL_MODES 13
-#define TOTAL_LEDS 180
-#define LED_PIN 22
+#define TOTAL_LEDS 1111
+#define LED_PIN 23
 #define SOUND_R_1 35
 #define SOUND_R_2 34
 #define IDICATE_PIN 2
-#define BUTTON_PIN 12
+#define BUTTON_PIN 4
 #define IR_PIN 27
 
 #define LED_CHIP WS2812
@@ -116,6 +116,7 @@ extern bool lowpass_trigger;
 extern uint8_t newBright;
 extern bool newPowerState;
 extern bool newPowerType; 
+extern bool apMode;
 
 // --- ОБЪЯВЛЕНИЯ ФУНКЦИЙ ---
 // Из audio_leds.cpp

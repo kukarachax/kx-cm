@@ -303,7 +303,6 @@ void setupAPServer() {
     
     data.WIFI_SSID = receivedSsid;
     data.WIFI_PASS = receivedPassword;
-    data.wifi_saved_flag = true;
     settings.updateNow();
     request->send(LittleFS, "/submit.html");
     delay(100);
@@ -330,6 +329,7 @@ void beginAP() {
 
   if (!data.wifi_saved_flag || !data.wifi_mode) setupCaptivePortal(localIP);
   setupAPServer();
+  apMode = true;
   digitalWrite(IDICATE_PIN, HIGH);
 }
 
@@ -358,6 +358,7 @@ void connectToWiFi() {
     }
   }
   fill_leds(0, (NUM_LEDS / 10), CRGB::Green);
+  apMode = false;
   data.wifi_saved_flag = true; 
   settings.updateNow();
 }
@@ -384,7 +385,7 @@ void networkInit() {
   dnsServer.stop();
   getLocalUID();
 
-  if (data.wifi_mode || !data.wifi_saved_flag) beginAP();
+  if (data.wifi_mode) beginAP();
   else connectToWiFi();
 
   getBroadcastIp();
@@ -393,6 +394,18 @@ void networkInit() {
   delay(500);
 }
 
+uint32_t reconnectInterval;
+void HandleWiFiNet() {
+  if (apMode) return;
+  
+  if (WiFi.status() != WL_CONNECTED || millis() - reconnectInterval > 60000) {
+    reconnectInterval = millis();
+
+    WiFi.disconnect();
+    data.wifi_saved_flag = WiFi.reconnect();
+    settings.updateNow();
+  }
+}
 
 void Core0Handler(void *pvParameters) {
   while (true) {
@@ -402,6 +415,7 @@ void Core0Handler(void *pvParameters) {
     ArduinoOTA.handle();
     udpListen();
     handleIR();
+    HandleWiFiNet();
 
     vTaskDelay(pdMS_TO_TICKS(2));
   }
