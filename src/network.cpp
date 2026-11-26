@@ -329,7 +329,6 @@ void beginAP() {
 
   if (!data.wifi_saved_flag || !data.wifi_mode) setupCaptivePortal(localIP);
   setupAPServer();
-  apMode = true;
   digitalWrite(IDICATE_PIN, HIGH);
 }
 
@@ -358,7 +357,6 @@ void connectToWiFi() {
     }
   }
   fill_leds(0, (NUM_LEDS / 10), CRGB::Green);
-  apMode = false;
   data.wifi_saved_flag = true; 
   settings.updateNow();
 }
@@ -394,19 +392,6 @@ void networkInit() {
   delay(500);
 }
 
-uint32_t reconnectInterval;
-void HandleWiFiNet() {
-  if (apMode) return;
-  
-  if (WiFi.status() != WL_CONNECTED || millis() - reconnectInterval > 60000) {
-    reconnectInterval = millis();
-
-    WiFi.disconnect();
-    data.wifi_saved_flag = WiFi.reconnect();
-    settings.updateNow();
-  }
-}
-
 void Core0Handler(void *pvParameters) {
   while (true) {
     if (settings.tick() == FD_WRITE) Serial.println("Data updated!");
@@ -415,7 +400,6 @@ void Core0Handler(void *pvParameters) {
     ArduinoOTA.handle();
     udpListen();
     handleIR();
-    HandleWiFiNet();
 
     vTaskDelay(pdMS_TO_TICKS(2));
   }

@@ -115,8 +115,7 @@ extern bool pair_enable;
 extern bool lowpass_trigger;
 extern uint8_t newBright;
 extern bool newPowerState;
-extern bool newPowerType; 
-extern bool apMode;
+extern bool newPowerType;
 
 // --- ОБЪЯВЛЕНИЯ ФУНКЦИЙ ---
 // Из audio_leds.cpp
