@@ -1,3 +1,4 @@
 {
-  "cmake.sourceDirectory": "E:/Projects/kx/kx-cm/.pio/libdeps/esp32doit-devkit-v1/ESPAsyncWebServer/examples/idf_component/catchall/main"
+  "cmake.sourceDirectory": "E:/Projects/kx/kx-cm/.pio/libdeps/esp32doit-devkit-v1/ESPAsyncWebServer/examples/idf_component/catchall/main",
+  "cmake.ignoreCMakeListsMissing": true
 }
